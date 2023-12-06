@@ -71,3 +71,7 @@ export const array = (type: bigint): bigint => {
 		throw new Error("The type you provided to array() was not found")
 	}
 }
+
+// export const tuple = (...args: bigint[]): bigint => {
+	
+// }

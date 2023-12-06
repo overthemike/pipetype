@@ -1,30 +1,10 @@
 import { typeDefinitions, createType, validatorMap, typeArrays } from "./definitions"
+import { TypeInstance } from "./instance";
 import { Schema, ProxyTarget, NestedObject, ValidationTarget } from "./types";
-
-function createSchema(schema: Schema): Schema {
-	// Iterate over the schema object to convert types
-	for (const [key, value] of Object.entries(schema)) {
-		if (typeof value === 'bigint') {
-			// Already a flag, no need to change
-			continue;
-		} else if (typeof value === 'function') {
-			// Convert to type flag
-			schema[key] = createType(value);
-		} else if (typeof value === 'object') {
-			// Nested schema
-			schema[key] = createSchema(value);
-		} else {
-			throw new Error(`Invalid schema type for property '${key}'`);
-		}
-	}
-
-	return schema;
-}
-
 
 // The Proxy to handle type definitions
 export const Type = new Proxy<ProxyTarget>({}, {
-	set(target, prop: string, definition) {
+	set(target, prop: string | symbol, definition) {
 		if (prop in target) {
 			console.warn(`Type "${String(prop)}" already exists.`);
 			return false;
@@ -42,15 +22,35 @@ export const Type = new Proxy<ProxyTarget>({}, {
 	},
 	get(target, prop: string) {
 		if (prop in target) {
-			return target[prop];
+			return target[prop]
 		}
-		throw new Error(`Type '${String(prop)}' is not defined.`);
+
+		// const propProxy = createSchemaObjectProxy(target, prop)
+		// return propProxy
 	},
 });
 
+// function createSchemaObjectProxy(theType:Schema, theName: string | symbol) {
+// 	return new Proxy({}, {
+// 		apply(target, thisArg, ...args) {
+// 			if (typeDefinitions.has(theName)) {
+// 				const schema = typeDefinitions.get(theName)
+// 				if (schema) {
+// 					return new TypeInstance({
+// 						name: theName,
+// 						schema: theType,
+						
+// 					})
+// 				}
+// 				throw new Error(`You're trying to invoke a type function call on a type that doesn't exist`)
+// 			}
+// 		}
+// 	})
+// }
+
 export function createValidationProxy(validationTarget: ValidationTarget) {
 	return new Proxy({}, {
-		set(target, prop: string, value) {
+		set(target, prop: string | symbol, value) {
 			if (typeof validationTarget === 'bigint') {
 				// Simple type validation
 				validateValue(validationTarget, value, `Validation failed for property '${String(prop)}'.`);
@@ -75,6 +75,26 @@ export function createValidationProxy(validationTarget: ValidationTarget) {
 			return Reflect.set(target, prop, value);
 		}
 	});
+}
+
+export function createSchema(schema: Schema): Schema {
+	// Iterate over the schema object to convert types
+	for (const [key, value] of Object.entries(schema)) {
+		if (typeof value === 'bigint') {
+			// Already a flag, no need to change
+			continue;
+		} else if (typeof value === 'function') {
+			// Convert to type flag
+			schema[key] = createType(value);
+		} else if (typeof value === 'object') {
+			// Nested schema
+			schema[key] = createSchema(value);
+		} else {
+			throw new Error(`Invalid schema type for property '${key}'`);
+		}
+	}
+
+	return schema;
 }
 
 function validateValue(typeFlag: bigint, value: any, errorMessage: string) {

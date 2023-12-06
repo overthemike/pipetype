@@ -11,6 +11,7 @@ export {
 	undef,
 	nullish,
 	date,
+	array,
 } from './definitions'
 
 export { Type as default } from './pipe'

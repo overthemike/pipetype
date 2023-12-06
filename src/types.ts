@@ -2,14 +2,14 @@ export type ValidatorFunction<T> = (value: T) => boolean
 
 export type ValidatorMap = Map<bigint, ValidatorFunction<any>>
 
-export type TypeDefinitionsMap = Map<string, bigint | Schema>
+export type TypeDefinitionsMap = Map<string | symbol, bigint | Schema>
 
 export type Schema = {
-	[key: string]: bigint | Schema
+	[key: string | symbol]: bigint | Schema
 }
 
 export type ProxyTarget = {
-	[key: string]: Schema
+	[key: string | symbol]: Schema
 }
 
 // stores whether or not the type definition is an array
