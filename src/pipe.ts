@@ -1,4 +1,4 @@
-import { typeDefinitions, createType, validatorMap } from "./definitions"
+import { typeDefinitions, createType, validatorMap, typeArrays } from "./definitions"
 import { Schema, ProxyTarget, NestedObject, ValidationTarget } from "./types";
 
 function createSchema(schema: Schema): Schema {
@@ -45,7 +45,7 @@ export const Type = new Proxy<ProxyTarget>({}, {
 			return target[prop];
 		}
 		throw new Error(`Type '${String(prop)}' is not defined.`);
-	}
+	},
 });
 
 export function createValidationProxy(validationTarget: ValidationTarget) {
@@ -80,10 +80,29 @@ export function createValidationProxy(validationTarget: ValidationTarget) {
 function validateValue(typeFlag: bigint, value: any, errorMessage: string) {
 	let isValid = false;
 
-	for (const [validatorFlag, validatorFn] of validatorMap.entries()) {
-		if ((typeFlag & validatorFlag) === validatorFlag && validatorFn(value)) {
-			isValid = true;
-			break;
+	if (typeArrays.has(typeFlag)) {
+		// The typeFlag is an array type
+		if (!Array.isArray(value)) {
+			throw new Error(`Expected an array for ${errorMessage}`);
+		}
+
+		// Retrieve the validator function for the array's type
+		const validatorFn = Array.from(validatorMap.entries())
+			.find(([validatorFlag, _]) => (typeFlag & validatorFlag) === validatorFlag)?.[1];
+
+		if (!validatorFn) {
+			throw new Error(`No validator found for array type: ${errorMessage}`);
+		}
+
+		// Validate each item in the array
+		isValid = value.every(item => validatorFn(item));
+	} else {
+		// Single value validation
+		for (const [validatorFlag, validatorFn] of validatorMap.entries()) {
+			if ((typeFlag & validatorFlag) === validatorFlag && validatorFn(value)) {
+				isValid = true;
+				break;
+			}
 		}
 	}
 
@@ -91,6 +110,7 @@ function validateValue(typeFlag: bigint, value: any, errorMessage: string) {
 		throw new Error(errorMessage);
 	}
 }
+
 
 function validateNestedObject(nestedSchema: Schema, value: NestedObject): boolean {
 	if (typeof value !== 'object' || value === null) {

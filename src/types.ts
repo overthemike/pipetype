@@ -12,14 +12,8 @@ export type ProxyTarget = {
 	[key: string]: Schema
 }
 
-export type SchemaPropertyArrayMapper = {
-	schema: Schema,
-	prop: string,
-	identifier: bigint
-}
-
 // stores whether or not the type definition is an array
-export type TypeDefinitionArrayWeakSet = WeakSet<SchemaPropertyArrayMapper>
+export type TypeDefinitionArraySet = Set<bigint>
 
 export type ValidationTarget = bigint | Schema;
 

@@ -1,4 +1,4 @@
-import { ValidatorFunction, TypeDefinitionsMap, ValidatorMap, TypeDefinitionArrayWeakSet } from "./types"
+import { ValidatorFunction, TypeDefinitionsMap, ValidatorMap, TypeDefinitionArraySet } from "./types"
 
 // keeps track of last used bigint
 let lastFlag = 1n
@@ -37,7 +37,7 @@ function getNextFlag(): bigint {
 	return lastFlag
 }
 
-export const typeArrays: TypeDefinitionArrayWeakSet = new WeakSet()
+export const typeArrays: TypeDefinitionArraySet = new Set()
 
 export function createType<T>(validator: ValidatorFunction<T>): bigint {
 	const newFlag = getNextFlag()
@@ -56,3 +56,18 @@ export const nil = createType<null>((value) => value === null)
 export const undef = createType<undefined>((value) => value === undefined)
 export const nullish = createType<null | undefined>((value) => value === undefined || value === null)
 export const date = createType<Date>((value) => Object.prototype.toString.call(value) === '[object Date]')
+
+export const array = (type: bigint): bigint => {
+	if (validatorMap.has(type)) {
+		const validatorFunction = validatorMap.get(type)
+		if (!validatorFunction) {
+			throw new Error("Validator function not found for the provided type")
+		}
+		const flag = createType(validatorFunction)
+		typeArrays.add(flag)
+
+		return flag
+	} else {
+		throw new Error("The type you provided to array() was not found")
+	}
+}
