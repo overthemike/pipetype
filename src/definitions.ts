@@ -1,4 +1,18 @@
-import { ValidatorFunction, TypeDefinitionsMap, ValidatorMap, TypeDefinitionArraySet } from "./types"
+import {
+	ValidatorFunction,
+	TypeDefinitionsMap,
+	ValidatorMap,
+	BigIntSet,
+	Literal,
+	ReadyOnlyProperties,
+	DescribeFunction,
+	DescriptionObject,
+	DefaultValueMap,
+	OptionalValueSet,
+	TypeDescriptionMap,
+	TypeTransformFunctionMap,
+	ValidationTarget,
+} from './types'
 
 // keeps track of last used bigint
 let lastFlag = 1n
@@ -37,7 +51,15 @@ function getNextFlag(): bigint {
 	return lastFlag
 }
 
-export const typeArrays: TypeDefinitionArraySet = new Set()
+export const typeArrays: BigIntSet = new Set()
+export const tupleTypes: BigIntSet = new Set()
+export const schemaTypes: BigIntSet = new Set()
+export const readonlyProperties: ReadyOnlyProperties = new Set()
+
+export const defaultValues: DefaultValueMap = new Map()
+export const optionalValues: OptionalValueSet = new Set()
+export const typeDescriptions: TypeDescriptionMap = new Map()
+export const typeTransformations: TypeTransformFunctionMap = new Map()
 
 export function createType<T>(validator: ValidatorFunction<T>): bigint {
 	const newFlag = getNextFlag()
@@ -49,29 +71,117 @@ export const any = createType<any>(() => true)
 export const unknown = createType<unknown>(() => true)
 export const string = createType<string>((value) => typeof value === 'string')
 export const number = createType<number>((value) => typeof value === 'number')
-export const boolean = createType<boolean>((value) => typeof value === 'boolean')
+export const boolean = createType<boolean>(
+	(value) => typeof value === 'boolean'
+)
 export const bigint = createType<bigint>((value) => typeof value === 'bigint')
 export const symbol = createType<symbol>((value) => typeof value === 'symbol')
 export const nil = createType<null>((value) => value === null)
 export const undef = createType<undefined>((value) => value === undefined)
-export const nullish = createType<null | undefined>((value) => value === undefined || value === null)
-export const date = createType<Date>((value) => Object.prototype.toString.call(value) === '[object Date]')
+export const nullish = createType<null | undefined>(
+	(value) => value === undefined || value === null
+)
+export const date = createType<Date>(
+	(value) => Object.prototype.toString.call(value) === '[object Date]'
+)
 
 export const array = (type: bigint): bigint => {
 	if (validatorMap.has(type)) {
 		const validatorFunction = validatorMap.get(type)
 		if (!validatorFunction) {
-			throw new Error("Validator function not found for the provided type")
+			throw new Error('Validator function not found for the provided type')
 		}
 		const flag = createType(validatorFunction)
 		typeArrays.add(flag)
 
 		return flag
 	} else {
-		throw new Error("The type you provided to array() was not found")
+		throw new Error('The type you provided to array() was not found')
 	}
 }
 
-// export const tuple = (...args: bigint[]): bigint => {
-	
-// }
+// A special function for tuples
+export const tuple = (...types: bigint[]): bigint => {
+	// Create a unique flag for this specific tuple combination
+	const flag = getNextFlag()
+
+	const tupleValidator: ValidatorFunction<any[]> = (...args) => {
+		if (args.length !== types.length) {
+			return false
+		}
+
+		return args.every((arg, index) => {
+			const validatorFn = validatorMap.get(types[index])
+			return validatorFn ? validatorFn(arg) : false
+		})
+	}
+
+	// Store the tuple validator with the unique flag
+	validatorMap.set(flag, tupleValidator as ValidatorFunction<unknown>)
+	tupleTypes.add(flag)
+	return flag
+}
+
+export const literal = (literal: Literal) => (value: Literal) =>
+	value === literal
+
+// enum is a reserved typescript keyword
+export const enom = (...literals: Literal[]): bigint => {
+	const enumValidator: ValidatorFunction<any> = (value) => {
+		return literals.includes(value)
+	}
+
+	return createType(enumValidator)
+}
+
+const uninitType = Symbol('Uninitialized Type')
+const uninitValidatorFunction = Symbol('Uninitialzed Validator Function')
+const uninitTransformFunction = Symbol('Unintialized Transform Function')
+
+const defaultOptions = {
+	type: uninitType,
+	validate: uninitValidatorFunction,
+	defaultValue: null,
+	optional: false,
+	description: '',
+	transform: uninitTransformFunction,
+} as const
+
+export const describe: DescribeFunction = (
+	options: DescriptionObject
+): bigint => {
+	const opts = { ...defaultOptions, ...options }
+	const { type, validate, defaultValue, optional, description, transform } =
+		opts
+
+	let flag: ValidationTarget
+
+	if (typeof type === 'symbol') {
+		// validation function should be provided
+		if (validate === uninitValidatorFunction) {
+			throw new Error('Must provide either a type or a validate function')
+		} else {
+			flag = createType(validate as ValidatorFunction<unknown>)
+		}
+	} else {
+		flag = type
+	}
+
+	if (defaultValue) {
+		defaultValues.set(flag, defaultValue)
+	}
+
+	if (optional) {
+		optionalValues.add(flag)
+	}
+
+	if (description !== '') {
+		typeDescriptions.set(flag, description)
+	}
+
+	if (typeof transform === 'function') {
+		typeTransformations.set(flag, transform)
+	}
+
+	return flag as bigint
+}
