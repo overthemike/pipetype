@@ -4,6 +4,8 @@ export type ValidatorMap = Map<bigint, ValidatorFunction<any>>
 
 export type TypeDefinitionsMap = Map<string | symbol, bigint | Schema>
 
+export type TypeSchemaMap = Map<bigint, string | symbol>
+
 export type Schema = {
 	[key: string | symbol]: bigint | Schema
 }
@@ -24,7 +26,7 @@ export type DynamicProxyObject = {
 export type TransformFunction = <T>(value: T) => any
 
 export type BigIntSet = Set<bigint>
-export type ReadyOnlyProperties = Set<string | symbol>
+export type ReadyOnlyProperties = Set<bigint>
 export type DefaultValueMap = Map<bigint | Schema, any>
 export type OptionalValueSet = Set<bigint | Schema>
 export type TypeDescriptionMap = Map<bigint | Schema, string>

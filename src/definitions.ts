@@ -12,6 +12,7 @@ import {
 	TypeDescriptionMap,
 	TypeTransformFunctionMap,
 	ValidationTarget,
+	TypeSchemaMap,
 } from './types'
 
 // keeps track of last used bigint
@@ -44,16 +45,16 @@ export const validatorMap: ValidatorMap = new Map()
  *  with a new bigint value associated with it and then store the bigint value in this map
  */
 export const typeDefinitions: TypeDefinitionsMap = new Map()
+export const typeSchemas: TypeSchemaMap = new Map()
 
 // Left shift to create the next avaialble bit for our new type
-function getNextFlag(): bigint {
+export function getNextFlag(): bigint {
 	lastFlag <<= 1n
 	return lastFlag
 }
 
 export const typeArrays: BigIntSet = new Set()
 export const tupleTypes: BigIntSet = new Set()
-export const schemaTypes: BigIntSet = new Set()
 export const readonlyProperties: ReadyOnlyProperties = new Set()
 
 export const defaultValues: DefaultValueMap = new Map()

@@ -3,7 +3,7 @@
 	"private": true,
 	"version": "0.0.0",
 	"type": "module",
-	"file": [
+	"files": [
 		"dist"
 	],
 	"main": "./dist/pipetype.umd.cjs",
@@ -16,11 +16,16 @@
 	},
 	"scripts": {
 		"dev": "vite",
-		"build": "tsc && vite build",
-		"preview": "vite preview"
+		"clean": "rimraf dist",
+		"build": "npm run clean && tsc && vite build",
+		"preview": "vite preview",
+		"bl": "npm run build && npm link"
 	},
 	"devDependencies": {
+		"rimraf": "^5.0.5",
+		"rollup-plugin-typescript2": "^0.36.0",
 		"typescript": "^5.0.2",
-		"vite": "^4.4.5"
+		"vite": "^4.4.5",
+		"vite-plugin-dts": "^3.6.4"
 	}
 }

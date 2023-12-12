@@ -4,15 +4,11 @@ import {
 	validatorMap,
 	typeArrays,
 	readonlyProperties,
+	typeSchemas,
+	getNextFlag,
 } from './definitions'
-import { TypeInstance } from './instance'
-import {
-	Schema,
-	ProxyTarget,
-	NestedObject,
-	ValidationTarget,
-	DynamicProxyObject,
-} from './types'
+// import { TypeInstance } from './instance'
+import { Schema, ProxyTarget, NestedObject, ValidationTarget } from './types'
 
 // The Proxy to handle type definitions
 export const Type = new Proxy<ProxyTarget>(
@@ -24,12 +20,20 @@ export const Type = new Proxy<ProxyTarget>(
 				return false
 			}
 
+			if (typeof definition === 'bigint') {
+				target[prop] = createValidationProxy(definition)
+				typeDefinitions.set(prop, definition)
+			}
+
 			if (
 				typeof definition === 'object' &&
 				definition !== null &&
 				!Array.isArray(definition)
 			) {
 				const schema = createSchema(definition)
+
+				const schemaFlag = getNextFlag()
+				typeSchemas.set(schemaFlag, prop)
 
 				target[prop] = createValidationProxy(schema)
 				typeDefinitions.set(prop, schema)
@@ -41,18 +45,60 @@ export const Type = new Proxy<ProxyTarget>(
 		},
 		get(target, prop: string) {
 			if (prop in target) {
-				// Return the unique flag associated with this type
-				const typeInfo = target[prop]
-				return typeof typeInfo === 'bigint'
-					? typeInfo
-					: createValidationProxy(typeInfo)
-			}
+				const schemaFlag = typeDefinitions.get(prop)
 
-			// Handle cases where the type is not predefined
-			const propProxy = createSchemaObjectProxy(prop)
-			return propProxy
+				if (typeof schemaFlag === 'bigint') {
+					// Create a Proxy that acts both as a function and a bigint
+					const schemaProxy = new Proxy(() => {}, {
+						apply: function (_target, _thisArg, _argumentsList) {
+							// Function call logic here
+							const schemaName = typeSchemas.get(schemaFlag)
+							if (!schemaName || typeof schemaName !== 'string') {
+								throw new Error(`Schema name not found for type '${prop}'.`)
+							}
+							const schema = typeDefinitions.get(schemaName)
+							if (!schema) {
+								throw new Error(`Schema not found for type '${prop}'.`)
+							}
+							return createValidationProxy(schema)
+						},
+						get: function (_target, key) {
+							// Return bigint flag when accessed as a property
+							if (key === 'toString') {
+								return () => schemaFlag.toString()
+							}
+							// Use the specific arguments needed for Reflect.get
+							return Reflect.get(_target, key)
+						},
+					})
+
+					return schemaProxy
+				} else if (typeof schemaFlag === 'object') {
+					// Create a Proxy that acts both as a function and an object
+					const schemaProxy = new Proxy(() => {}, {
+						apply: function (_target, _thisArg, _argumentsList) {
+							// Function call logic here
+							return createValidationProxy(schemaFlag) // Returning the object directly
+						},
+						get: function (_target, key) {
+							// Delegate to the object itself
+							if (key in schemaFlag) {
+								return createValidationProxy(schemaFlag[key])
+							}
+
+							// Fallback or custom logic for other keys
+							return Reflect.get(_target, key)
+						},
+					})
+
+					return schemaProxy
+				} else {
+					throw new Error(`Type '${prop}' is not a defined schema.`)
+				}
+			}
 		},
-		apply: function (target, thisArg, [schema]) {
+
+		apply: function (_target, _thisArg, [schema]) {
 			if (
 				typeof schema !== 'object' ||
 				schema === null ||
@@ -75,52 +121,14 @@ export const Type = new Proxy<ProxyTarget>(
 	}
 )
 
-function createSchemaObjectProxy(theName: string) {
-	return new Proxy<DynamicProxyObject>(
-		{},
-		{
-			/**
-			 * Calling Type() without new will create our type "service" or "utility"
-			 *	(looking for a better name for this) object.
-			 *	This will provide functions we can run on objects without committing
-			 *	them by instantiation. Essentially static one time use functions.
-			 *
-			 * This object will have functions lke parse(), validate()
-			 */
-			apply: function (target, thisArg, argumentsList) {
-				// Retrieve the schema from typeDefinitions using theName
-				const schema = typeDefinitions.get(theName)
-				if (!schema) {
-					throw new Error(`Schema not found for type '${theName}'`)
-				}
+export function readOnlyCheck(flag: bigint, value: any) {
+	const readOnly = readonlyProperties.has(flag)
 
-				// Create and populate the type instance
-				if (typeof schema === 'object') {
-					const typeInstance = new TypeInstance(schema)
-
-					return typeInstance
-				}
-			},
-			/**
-			 * This will create instantiation of the provided type with all of the properties
-			 * and rules associated with it. Whatever values you pass in will be immediately
-			 * validated and committed to that object.
-			 * @param target
-			 * @param argArray
-			 * @param newTarget
-			 */
-			construct(target, argArray, newTarget) {
-				const schema = typeDefinitions.get(theName)
-				if (typeof schema !== 'object' || typeof schema !== 'bigint') {
-					throw new Error(`Schema not found for type '${theName}'`)
-				}
-
-				// Create and populate the type instance
-				const typeInstance = new TypeInstance(schema)
-				return typeInstance
-			},
+	if (readOnly) {
+		if (value !== undefined) {
+			throw new Error('Trying to set value on read only property')
 		}
-	)
+	}
 }
 
 export function createValidationProxy(validationTarget: ValidationTarget) {
@@ -130,6 +138,7 @@ export function createValidationProxy(validationTarget: ValidationTarget) {
 			set(target, prop: string | symbol, value) {
 				if (typeof validationTarget === 'bigint') {
 					// Simple type validation
+					readOnlyCheck(validationTarget, Reflect.get(target, prop))
 					validateValue(
 						validationTarget,
 						value,
@@ -139,6 +148,7 @@ export function createValidationProxy(validationTarget: ValidationTarget) {
 					// Schema or nested schema validation
 					const typeFlagOrNestedSchema = validationTarget[prop]
 					if (typeof typeFlagOrNestedSchema === 'bigint') {
+						readOnlyCheck(typeFlagOrNestedSchema, Reflect.get(target, prop))
 						// Property is a simple type
 						validateValue(
 							typeFlagOrNestedSchema,
@@ -185,9 +195,15 @@ export function createSchema(
 		if (typeof value === 'bigint') {
 			// Already a flag, no need to change, but apply actualKey for readonly
 			processedSchema[actualKey] = value
+			if (isReadonly) {
+				readonlyProperties.add(value) // Assuming readonlyProperties is a Set
+			}
 		} else if (typeof value === 'function') {
 			// Convert function to type flag, apply actualKey for readonly
 			processedSchema[actualKey] = createType(value)
+			if (isReadonly) {
+				readonlyProperties.add(processedSchema[actualKey] as bigint) // Assuming readonlyProperties is a Set
+			}
 		} else if (
 			typeof value === 'object' &&
 			value !== null &&
@@ -197,11 +213,6 @@ export function createSchema(
 			processedSchema[actualKey] = createSchema(value, isReadonly)
 		} else {
 			throw new Error(`Invalid schema type for property '${key}'`)
-		}
-
-		// Store readonly status if the property or its parent is readonly
-		if (isReadonly) {
-			readonlyProperties.add(actualKey) // Assuming readonlyProperties is a Set
 		}
 	}
 
