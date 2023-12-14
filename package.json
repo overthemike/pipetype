@@ -19,11 +19,15 @@
 		"clean": "rimraf dist",
 		"build": "npm run clean && tsc && vite build",
 		"preview": "vite preview",
-		"bl": "npm run build && npm link"
+		"bl": "npm run build && npm link",
+		"test": "jest"
 	},
 	"devDependencies": {
+		"@types/jest": "^29.5.11",
+		"jest": "^29.7.0",
 		"rimraf": "^5.0.5",
 		"rollup-plugin-typescript2": "^0.36.0",
+		"ts-jest": "^29.1.1",
 		"typescript": "^5.0.2",
 		"vite": "^4.4.5",
 		"vite-plugin-dts": "^3.6.4"

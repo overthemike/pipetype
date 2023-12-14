@@ -6,50 +6,60 @@ import {
 	readonlyProperties,
 	typeSchemas,
 	getNextFlag,
+	schemaTypeMap,
 } from './definitions'
 // import { TypeInstance } from './instance'
-import { Schema, ProxyTarget, NestedObject, ValidationTarget } from './types'
+import {
+	Schema,
+	ProxyTarget,
+	NestedObject,
+	ValidationTarget,
+	CallableSchema,
+	DynamicProxyObject,
+	SchemaProxy,
+} from './types'
 
 // The Proxy to handle type definitions
-export const Type = new Proxy<ProxyTarget>(
-	{},
-	{
-		set(target, prop: string | symbol, definition) {
-			if (prop in target) {
-				console.warn(`Type "${String(prop)}" already exists.`)
-				return false
-			}
+export const Type = new Proxy<ProxyTarget>({} as ProxyTarget, {
+	set(target, prop: string, definition) {
+		if (prop in target) {
+			console.warn(`Type "${String(prop)}" already exists.`)
+			return false
+		}
 
-			if (typeof definition === 'bigint') {
-				target[prop] = createValidationProxy(definition)
-				typeDefinitions.set(prop, definition)
-			}
+		if (typeof definition === 'bigint') {
+			target[prop] = createValidationProxy(definition)
+			typeDefinitions.set(prop, definition)
+		}
 
-			if (
-				typeof definition === 'object' &&
-				definition !== null &&
-				!Array.isArray(definition)
-			) {
-				const schema = createSchema(definition)
+		if (
+			typeof definition === 'object' &&
+			definition !== null &&
+			!Array.isArray(definition)
+		) {
+			const schema = createSchema(definition)
 
-				const schemaFlag = getNextFlag()
-				typeSchemas.set(schemaFlag, prop)
+			const schemaFlag = getNextFlag()
+			typeSchemas.set(schemaFlag, prop)
+			schemaTypeMap.set(prop, schemaFlag)
 
-				target[prop] = createValidationProxy(schema)
-				typeDefinitions.set(prop, schema)
-			} else {
-				throw new Error(`Invalid type. Expected an object.`)
-			}
+			target[prop] = createValidationProxy(schema)
+			typeDefinitions.set(prop, schema)
+		} else {
+			throw new Error(`Invalid type. Expected an object.`)
+		}
 
-			return true
-		},
-		get(target, prop: string) {
-			if (prop in target) {
-				const schemaFlag = typeDefinitions.get(prop)
+		return true
+	},
+	get(target, prop: string) {
+		if (prop in target) {
+			const schemaFlag = typeDefinitions.get(prop)
 
-				if (typeof schemaFlag === 'bigint') {
-					// Create a Proxy that acts both as a function and a bigint
-					const schemaProxy = new Proxy(() => {}, {
+			if (typeof schemaFlag === 'bigint') {
+				// Create a Proxy that acts both as a function and a bigint
+				const schemaProxy = new Proxy(
+					{},
+					{
 						apply: function (_target, _thisArg, _argumentsList) {
 							// Function call logic here
 							const schemaName = typeSchemas.get(schemaFlag)
@@ -68,58 +78,66 @@ export const Type = new Proxy<ProxyTarget>(
 								return () => schemaFlag.toString()
 							}
 							// Use the specific arguments needed for Reflect.get
-							return Reflect.get(_target, key)
+							// return Reflect.get(_target, key)
+							const flag = schemaTypeMap.get(prop)
+							return flag
 						},
-					})
+					}
+				)
 
-					return schemaProxy
-				} else if (typeof schemaFlag === 'object') {
-					// Create a Proxy that acts both as a function and an object
-					const schemaProxy = new Proxy(() => {}, {
+				return schemaProxy as SchemaProxy
+			} else if (typeof schemaFlag === 'object') {
+				// Create a Proxy that acts both as a function and an object
+				const schemaProxy = new Proxy(
+					{},
+					{
 						apply: function (_target, _thisArg, _argumentsList) {
 							// Function call logic here
 							return createValidationProxy(schemaFlag) // Returning the object directly
 						},
-						get: function (_target, key) {
+						get: function (_target, key): DynamicProxyObject | bigint {
 							// Delegate to the object itself
 							if (key in schemaFlag) {
 								return createValidationProxy(schemaFlag[key])
 							}
 
 							// Fallback or custom logic for other keys
-							return Reflect.get(_target, key)
+							const flag = createType(() => true)
+							return flag
 						},
-					})
+					}
+				)
 
-					return schemaProxy
-				} else {
-					throw new Error(`Type '${prop}' is not a defined schema.`)
-				}
+				return schemaProxy as SchemaProxy
+			} else {
+				throw new Error(`Type '${prop}' is not a defined schema.`)
 			}
-		},
+		}
+		// Default behavior if property is not found
+		throw new Error(`Type '${prop}' is not a defined schema.`)
+	},
 
-		apply: function (_target, _thisArg, [schema]) {
-			if (
-				typeof schema !== 'object' ||
-				schema === null ||
-				Array.isArray(schema)
-			) {
-				throw new Error('Invalid schema. Expected an object.')
-			}
+	apply: function (_target, _thisArg, [schema]) {
+		if (
+			typeof schema !== 'object' ||
+			schema === null ||
+			Array.isArray(schema)
+		) {
+			throw new Error('Invalid schema. Expected an object.')
+		}
 
-			// Generate a unique Symbol as an identifier for this type
-			const typeSymbol = Symbol('DynamicType')
+		// Generate a unique Symbol as an identifier for this type
+		const typeSymbol = Symbol('DynamicType')
 
-			const processedSchema = createSchema(schema)
-			const typeFlag = createType(() => true) // no type validation required for outermost Type()
+		const processedSchema = createSchema(schema)
+		const typeFlag = createType(() => true) // no type validation required for outermost Type()
 
-			// Associate the schema with the unique Symbol in typeDefinitions
-			typeDefinitions.set(typeSymbol, processedSchema)
+		// Associate the schema with the unique Symbol in typeDefinitions
+		typeDefinitions.set(typeSymbol, processedSchema)
 
-			return typeFlag
-		},
-	}
-)
+		return typeFlag
+	},
+}) as ProxyTarget & (() => CallableSchema)
 
 export function readOnlyCheck(flag: bigint, value: any) {
 	const readOnly = readonlyProperties.has(flag)

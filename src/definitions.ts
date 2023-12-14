@@ -13,6 +13,7 @@ import {
 	TypeTransformFunctionMap,
 	ValidationTarget,
 	TypeSchemaMap,
+	SchemaTypeMap,
 } from './types'
 
 // keeps track of last used bigint
@@ -46,6 +47,7 @@ export const validatorMap: ValidatorMap = new Map()
  */
 export const typeDefinitions: TypeDefinitionsMap = new Map()
 export const typeSchemas: TypeSchemaMap = new Map()
+export const schemaTypeMap: SchemaTypeMap = new Map()
 
 // Left shift to create the next avaialble bit for our new type
 export function getNextFlag(): bigint {
@@ -69,7 +71,9 @@ export function createType<T>(validator: ValidatorFunction<T>): bigint {
 }
 
 export const any = createType<any>(() => true)
-export const unknown = createType<unknown>(() => true)
+export const unknown = createType<unknown>(
+	(value) => value !== undefined && value !== null
+)
 export const string = createType<string>((value) => typeof value === 'string')
 export const number = createType<number>((value) => typeof value === 'number')
 export const boolean = createType<boolean>(
@@ -123,11 +127,11 @@ export const tuple = (...types: bigint[]): bigint => {
 	return flag
 }
 
-export const literal = (literal: Literal) => (value: Literal) =>
-	value === literal
+export const literal = (literal: Literal) =>
+	createType((value: Literal) => value === literal)
 
 // enum is a reserved typescript keyword
-export const enom = (...literals: Literal[]): bigint => {
+export const enom = (...literals: Literal[] | string[]): bigint => {
 	const enumValidator: ValidatorFunction<any> = (value) => {
 		return literals.includes(value)
 	}
@@ -148,7 +152,7 @@ const defaultOptions = {
 	transform: uninitTransformFunction,
 } as const
 
-export const describe: DescribeFunction = (
+export const expound: DescribeFunction = (
 	options: DescriptionObject
 ): bigint => {
 	const opts = { ...defaultOptions, ...options }
