@@ -153,6 +153,10 @@ export function createValidationProxy(validationTarget: ValidationTarget) {
 	return new Proxy(
 		{},
 		{
+			apply(_target, _thisArg, ..._args) {
+				console.log(_target, _thisArg)
+				return 'asdxf'
+			},
 			set(target, prop: string | symbol, value) {
 				if (typeof validationTarget === 'bigint') {
 					// Simple type validation

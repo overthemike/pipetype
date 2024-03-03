@@ -1,6 +1,6 @@
-export type ValidatorFunction<T> = (value: T) => boolean
+export type ValidatorFunction = (value: any) => boolean
 
-export type ValidatorMap = Map<bigint, ValidatorFunction<any>>
+export type ValidatorMap = Map<bigint, ValidatorFunction>
 
 export type TypeDefinitionsMap = Map<string | symbol, bigint | Schema>
 
@@ -54,7 +54,7 @@ export type Literal = string | number | boolean | bigint | symbol
 
 export type DescriptionObject = {
 	type: ValidationTarget | symbol
-	validate?: ValidatorFunction<unknown> | symbol
+	validate?: ValidatorFunction | symbol
 	defaultValue?: unknown
 	optional?: boolean
 	description?: string
