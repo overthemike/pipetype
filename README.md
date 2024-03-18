@@ -38,24 +38,34 @@ const isEmail = (str) => {
 	return regex.test(str)
 }
 
-// Define a custom email type
-const Email = createType((str) => isEmail(str))
+// Define a custom type function to verify the value for whatever is being set to the type
+const Email = Type((str) => isEmail(str))
 
 // Define a user schema
-Type.User = {
+const User = Type({
 	id: string | number, // example of a union
 	name: string,
 	email: Email, // type created above
 	age: number,
 	isActive: boolean,
-}
+})
 
-// Create a user object
-const user = Type.User()
-user.name = 'John Doe'
-user.email = 'john.doe@example.com'
-user.age = 30
-user.isActive = 'true' // throws an error
+// optional properties can be created by appending "?" at the end of a property string
+// or by using optional_{property name}
+const Profile = Type({
+	id: string | number,
+	user: User, // can use a schema as a type to verify that the property follows the rules of the type used to create it
+	'address?': string,
+	optional_address2: string
+})
+
+// readonly properties can be created by appending "*" at the end of a property string
+// or by using readonl_{property name}
+const Role = Type({
+	id: string | number,
+	'name*': string,
+	readonly_name: string
+})
 ```
 
 ### Advanced and Planned Future Usage

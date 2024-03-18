@@ -130,7 +130,7 @@ function fnProxy(validatorFunction: ValidatorFunction) {
 					let boundFunction: PrimitiveFunction = function (...args: any) {
 						return originalToPrimitive.apply(target, args)
 					}
-					// Assert that originalToPrimitive is a function before calling bind
+
 					boundFunction[Symbol.toPrimitive] = (
 						originalToPrimitive as Function
 					).bind(target)
@@ -148,7 +148,7 @@ function objProxy(obj: Schema) {
 	const flag = createSchema(obj)
 
 	const createTypeObject: PrimitiveFunction = function (): void {
-		// this is where I'm stuck. This should accept a schema object
+		
 	}
 
 	createTypeObject[Symbol.toPrimitive] = function (
