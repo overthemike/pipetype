@@ -28,7 +28,7 @@ const Amanda = Person({
 
 
 // as a flag
-const foo = Type(string | Email)
+const foob  = Type(string | Email)
 
 
 // optional
@@ -45,16 +45,20 @@ const More = Type({
 })
 
 
+const Async = new Proxy()
+
+const AsyncFuncType = Async(fn([number, number], number))
+
+const foo = {
+	someAsyncPropertyFunction: AsyncFuncType(async ())
+}
 
 
 
+// const asyn = new Proxy(asyncFunction, {
+// 	...
+// })
 
-fn
-1
+// const AsyncFnType = asyn(fn([number, number], number))
 
-fn
-10
-
-100
-1000
-10010
+// const doSomethingAsync = AsyncFnType(async (num1, num2) => await setTimeout(...))

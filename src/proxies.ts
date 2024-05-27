@@ -148,7 +148,7 @@ function objProxy(obj: Schema) {
 	const flag = createSchema(obj)
 
 	const createTypeObject: PrimitiveFunction = function (): void {
-		
+
 	}
 
 	createTypeObject[Symbol.toPrimitive] = function (
@@ -180,6 +180,21 @@ function objProxy(obj: Schema) {
 			}
 			return Reflect.get(target, prop, receiver)
 		},
+		set(target, property, value) {
+			// Get the combined validator flags
+			const validatorFlags = Reflect.get(target, property);
+			// Loop through the FlagToValidatorMap to find the validator functions
+			for (const [flags, validator] of FlagToValidatorMap) {
+				if (validatorFlags & flags) { // Check if the flags match
+					if (validator(value)) {
+						// Value is valid, return true immediately
+						return true;
+					}
+				}
+			}
+			// If no validator returned true, throw an error
+			throw new Error(`Invalid value for property ${property.toString()}`);
+		}
 	})
 
 	return proxy
