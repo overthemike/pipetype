@@ -188,3 +188,10 @@ export const expound: DescribeFunction = (
 
 	return flag as bigint
 }
+
+
+
+
+// Async<>
+
+// async()
